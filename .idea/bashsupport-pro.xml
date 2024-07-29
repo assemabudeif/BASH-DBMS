@@ -4,6 +4,7 @@
     <globalVariables>
       <var name="columns_array" />
       <var name="values_array" />
+      <var name="new_values" />
     </globalVariables>
   </component>
 </project>

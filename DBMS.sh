@@ -160,8 +160,8 @@ function insert_into_table {
         continue
       fi
       # check id primary key exists
-      new_primery_key=$(echo "$values" | cut -d "," -f1)
-      if grep -q "$new_primery_key" "$table_name"; then
+      new_primary_key=$(echo "$values" | cut -d "," -f1)
+      if grep -q "$new_primary_key" "$table_name"; then
         echo -e "${BRed}Primary key already exists!${Color_Off}"
         try_again
         continue
@@ -300,9 +300,10 @@ function delete_from_table {
 
 }
 
-# TODO: Update Table
+# Update Date in Table
 function update_table {
   while true; do
+    valid_data=1
     echo -e "${BBlue}Update Table:${Color_Off}"
     read -r -p "Enter table name: " table_name
     if [ "$table_name" == "q" ]; then
@@ -316,47 +317,64 @@ function update_table {
       echo -e "${BYellow}Enter the primary key of the row to update: ${Color_Off}"
       read -r primary_key
       if grep -q "^$primary_key," "$table_name"; then
-        echo -e "${BYellow}Enter the column name to update: ${Color_Off}"
-        read -r column_name
-        table_schema=$(head -1 "$table_name")
-        primary_key_column=$(echo "$table_schema" | cut -d "," -f1 | cut -d ":" -f1)
-        if [ "$column_name" == "$primary_key_column" ]; then
-          echo -e "${BRed}Primary key cannot be updated!${Color_Off}"
+        echo -e "${BYellow}Enter new row values without primary key value in the format: value,value,...${Color_Off}"
+        read -r values
+        if [[ ! $values =~ $values_format ]]; then
+          echo -e "${BRed}Invalid values format!${Color_Off}"
           try_again
           continue
         fi
-        if echo "$table_schema" | grep -q "$column_name"; then
-          echo -e "${BYellow}Enter the new value: ${Color_Off}"
-          read -r new_value
-          column_type=$(echo "$table_schema" | grep -o "$column_name:[^,]*" | cut -d ":" -f 2)
-          if [ "$column_type" == "int" ]; then
-            if [[ ! "$new_value" =~ ^[0-9]+$ ]]; then
-              echo -e "${BRed}Invalid value for column $column_name, expected int!${Color_Off}"
-              try_again
-              continue
-            fi
-          elif [ "$column_type" == "string" ]; then
-            if [[ ! "$new_value" =~ ^[a-zA-Z0-9_]+$ ]]; then
-              echo -e "${BRed}Invalid value for column $column_name, expected string!${Color_Off}"
-              try_again
-              continue
-            fi
-          fi
-          old_row=$(grep "^$primary_key," "$table_name")
-          new_row=$(echo "$old_row" | sed "s/\($column_name:\)[^,]*/\1$new_value/")
-          sed -i "s/^$old_row$/$new_row/" "$table_name"
-          echo -e "${BGreen}Row updated successfully!${Color_Off}"
-        else
-          echo -e "${BRed}Column name does not exist!${Color_Off}"
-          try_again
-          continue
-        fi
+
       else
         echo -e "${BRed}Primary key does not exist!${Color_Off}"
         try_again
         continue
       fi
+      # check columns data types
+      new_values="$primary_key,$values"
+      table_schema=$(head -1 "$table_name")
+      IFS=','
+      read -ra columns_array <<<"$table_schema"
+      IFS=','
+      read -ra values_array <<<"$new_values"
+      if [ "${#columns_array[@]}" -ne "${#values_array[@]}" ]; then
+        echo -e "${BRed}Invalid number of values!${Color_Off}"
+        try_again
+        continue
+      fi
+      index=0
+      for val in "${columns_array[@]}"; do
+        column=$(echo "${val}" | cut -d ":" -f 1)
+        column_type=$(echo "${val}" | cut -d ":" -f 2)
+        value=$(echo "${values_array[$index]}")
+        # check column data type
+        if [ "$column_type" == "int" ]; then
+          if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+            echo -e "${BRed}Invalid value for column $column, expected int!${Color_Off}"
+            try_again
+            valid_data=0
+            break
+          fi
+        elif [ "$column_type" == "string" ]; then
+          if [[ ! "$value" =~ ^[a-zA-Z0-9_]+$ ]]; then
+            echo -e "${BRed}Invalid value for column $column, expected string!${Color_Off}"
+            try_again
+            valid_data=0
+            break
+          fi
+        fi
+        index=$((index + 1))
+      done
+
+      if [ "$valid_data" -eq 0 ]; then
+        continue
+      fi
+
+      sed -i "/^$primary_key,/d" "$table_name"
+      echo "$new_values" >>"$table_name"
+      echo -e "${BGreen}Row updated successfully!${Color_Off}"
       echo -e "${BYellow}Enter q to exit, or Press Enter to Update another ${Color_Off}"
+
       read -r exit
       if [ "$exit" == "q" ]; then
         clear
