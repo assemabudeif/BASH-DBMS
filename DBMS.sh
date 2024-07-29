@@ -41,7 +41,7 @@ fi
 # Database and Table Name Pattern
 name_pattern="^[a-zA-Z][a-zA-Z0-9_]*[a-zA-Z0-9]$"
 schema_format="^[a-zA-Z][a-zA-Z0-9_]*[a-zA-Z0-9]:(int|string)(,[a-zA-Z][a-zA-Z0-9_]*[a-zA-Z0-9]:(int|string))*$"
-values_format="^[a-zA-Z][a-zA-Z0-9_]*[a-zA-Z0-9]:[0-9]+(,[a-zA-Z][a-zA-Z0-9_]*[a-zA-Z0-9]:[0-9]+)*$"
+values_format="^[0-9a-zA-Z\s]+(,[0-9a-zA-Z\s]+)*$"
 
 # Try again function
 function try_again {
@@ -138,9 +138,10 @@ function define_table_schema {
   done
 }
 
-# TODO: Insert into Table
+# Insert Data into Table
 function insert_into_table {
   while true; do
+    valid_data=1
     echo -e "${BBlue}Insert into Table: (enter q to exit)${Color_Off}"
     read -r -p "Enter table name: " table_name
     if [ "$table_name" == "q" ]; then
@@ -151,42 +152,56 @@ function insert_into_table {
       echo -e "${BGreen}Table exists!${Color_Off}"
       echo -e "${BYellow}Table Schema:${Color_Off}"
       echo -e "${BGreen}$(head -1 "$table_name")${Color_Off}"
-      echo -e "${BYellow}Enter values in the format: column_name:value,column_name:value,...${Color_Off}"
+      echo -e "${BYellow}Enter values in the format: value,value,...${Color_Off}"
       read -r values
       if [[ ! $values =~ $values_format ]]; then
         echo -e "${BRed}Invalid values format!${Color_Off}"
         try_again
         continue
       fi
-      # Check if primary key exists
-      primary_key=$(head -1 "$table_name" | cut -d "," -f 1)
-      primary_key_column=$(echo "$values" | cut -d "," -f 1)
-      if grep -q "$primary_key_column" "$table_name"; then
+      # check id primary key exists
+      new_primery_key=$(echo "$values" | cut -d "," -f1)
+      if grep -q "$new_primery_key" "$table_name"; then
         echo -e "${BRed}Primary key already exists!${Color_Off}"
         try_again
         continue
       fi
-
-      # Check values data types
+      # check columns data types
       table_schema=$(head -1 "$table_name")
-      IFS=',' read -r -a schema <<<"$table_schema"
-      IFS=',' read -r -a values_array <<<"$values"
-      for i in "${!schema[@]}"; do
-        column_name=$(echo "${schema[$i]}" | cut -d ":" -f 1)
-        column_type=$(echo "${schema[$i]}" | cut -d ":" -f 2)
-        value=$(echo "${values_array[$i]}" | cut -d ":" -f 2)
-        if [ "$column_type" == "int" ] && ! [[ "$value" =~ ^[0-9]+$ ]]; then
-          echo -e "${BRed}Invalid value for column $column_name, expected int!${Color_Off}"
-          try_again
-          continue
-        elif [ "$column_type" == "string" ] && [[ "$value" =~ ^[0-9]+$ ]]; then
-          echo -e "${BRed}Invalid value for column $column_name, expected string!${Color_Off}"
-          try_again
-          continue
+      IFS=','
+      read -ra columns_array <<<"$table_schema"
+      IFS=','
+      read -ra values_array <<<"$values"
+      index=0
+      for val in "${columns_array[@]}"; do
+        column=$(echo "${val}" | cut -d ":" -f 1)
+        column_type=$(echo "${val}" | cut -d ":" -f 2)
+        value=$(echo "${values_array[$i]}")
+
+        # check column data type
+        if [ "$column_type" == "int" ]; then
+          if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+            echo -e "${BRed}Invalid value for column $column, expected int!${Color_Off}"
+            try_again
+            valid_data=0
+            break
+          fi
+        elif [ "$column_type" == "string" ]; then
+          if [[ ! "$value" =~ ^[a-zA-Z0-9_]+$ ]]; then
+            echo -e "${BRed}Invalid value for column $column, expected string!${Color_Off}"
+            try_again
+            valid_data=0
+            break
+          fi
         fi
+        index=$((index + 1))
       done
-      # Append values to table
-      echo "$values" >>"$table_name" # Append values to table
+
+      if [ "$valid_data" -eq 0 ]; then
+        continue
+      fi
+
+      echo "$values" >>"$table_name"
       echo -e "${BGreen}Values inserted successfully!${Color_Off}"
 
       echo -e "${BYellow}Press q to exit: ${Color_Off}"
@@ -203,7 +218,7 @@ function insert_into_table {
   done
 }
 
-# TODO: Select from Table
+# View Data from Table
 function select_from_table {
   while true; do
     echo -e "${BBlue}Select From Table:${Color_Off}"
@@ -247,14 +262,112 @@ function drop_table {
   fi
 }
 
-# TODO: Delete from Table
+# Delete Row from Table
 function delete_from_table {
-  echo ""
+  while true; do
+    echo -e "${BBlue}Delete From Table:${Color_Off}"
+    read -r -p "Enter table name: " table_name
+    if [ "$table_name" == "q" ]; then
+      clear
+      break
+    fi
+    if [ -f "$table_name" ]; then
+      echo -e "${BGreen}Table exists!${Color_Off}"
+      echo -e "${BYellow}Table Schema:${Color_Off}"
+      cat "$table_name"
+      echo -e "${BYellow}Enter the primary key of the row to delete: ${Color_Off}"
+      read -r primary_key
+      if grep -q "^$primary_key," "$table_name"; then
+        sed -i "/^$primary_key,/d" "$table_name"
+        echo -e "${BGreen}Row deleted successfully!${Color_Off}"
+      else
+        echo -e "${BRed}Primary key does not exist!${Color_Off}"
+        try_again
+        continue
+      fi
+      echo -e "${BYellow}Enter q to exit, or Press Enter to Delete another ${Color_Off}"
+      read -r exit
+      if [ "$exit" == "q" ]; then
+        clear
+        break
+      fi
+    else
+      echo -e "${BRed}Table does not exist!${Color_Off}"
+      try_again
+      continue
+    fi
+  done
+
 }
 
 # TODO: Update Table
 function update_table {
-  echo ""
+  while true; do
+    echo -e "${BBlue}Update Table:${Color_Off}"
+    read -r -p "Enter table name: " table_name
+    if [ "$table_name" == "q" ]; then
+      clear
+      break
+    fi
+    if [ -f "$table_name" ]; then
+      echo -e "${BGreen}Table exists!${Color_Off}"
+      echo -e "${BYellow}Table Schema:${Color_Off}"
+      cat "$table_name"
+      echo -e "${BYellow}Enter the primary key of the row to update: ${Color_Off}"
+      read -r primary_key
+      if grep -q "^$primary_key," "$table_name"; then
+        echo -e "${BYellow}Enter the column name to update: ${Color_Off}"
+        read -r column_name
+        table_schema=$(head -1 "$table_name")
+        primary_key_column=$(echo "$table_schema" | cut -d "," -f1 | cut -d ":" -f1)
+        if [ "$column_name" == "$primary_key_column" ]; then
+          echo -e "${BRed}Primary key cannot be updated!${Color_Off}"
+          try_again
+          continue
+        fi
+        if echo "$table_schema" | grep -q "$column_name"; then
+          echo -e "${BYellow}Enter the new value: ${Color_Off}"
+          read -r new_value
+          column_type=$(echo "$table_schema" | grep -o "$column_name:[^,]*" | cut -d ":" -f 2)
+          if [ "$column_type" == "int" ]; then
+            if [[ ! "$new_value" =~ ^[0-9]+$ ]]; then
+              echo -e "${BRed}Invalid value for column $column_name, expected int!${Color_Off}"
+              try_again
+              continue
+            fi
+          elif [ "$column_type" == "string" ]; then
+            if [[ ! "$new_value" =~ ^[a-zA-Z0-9_]+$ ]]; then
+              echo -e "${BRed}Invalid value for column $column_name, expected string!${Color_Off}"
+              try_again
+              continue
+            fi
+          fi
+          old_row=$(grep "^$primary_key," "$table_name")
+          new_row=$(echo "$old_row" | sed "s/\($column_name:\)[^,]*/\1$new_value/")
+          sed -i "s/^$old_row$/$new_row/" "$table_name"
+          echo -e "${BGreen}Row updated successfully!${Color_Off}"
+        else
+          echo -e "${BRed}Column name does not exist!${Color_Off}"
+          try_again
+          continue
+        fi
+      else
+        echo -e "${BRed}Primary key does not exist!${Color_Off}"
+        try_again
+        continue
+      fi
+      echo -e "${BYellow}Enter q to exit, or Press Enter to Update another ${Color_Off}"
+      read -r exit
+      if [ "$exit" == "q" ]; then
+        clear
+        break
+      fi
+    else
+      echo -e "${BRed}Table does not exist!${Color_Off}"
+      try_again
+      continue
+    fi
+  done
 }
 
 # Connect to Database, and all table operations
