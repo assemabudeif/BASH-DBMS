@@ -9,26 +9,6 @@ BGreen='\033[1;32m'  # Green
 BYellow='\033[1;33m' # Yellow
 BBlue='\033[1;34m'   # Blue
 
-# Background
-On_Black='\033[40m'  # Black
-On_Red='\033[41m'    # Red
-On_Green='\033[42m'  # Green
-On_Yellow='\033[43m' # Yellow
-On_Blue='\033[44m'   # Blue
-On_Purple='\033[45m' # Purple
-On_Cyan='\033[46m'   # Cyan
-On_White='\033[47m'  # White
-
-# High Intensity backgrounds
-On_IBlack='\033[0;100m'  # Black
-On_IRed='\033[0;101m'    # Red
-On_IGreen='\033[0;102m'  # Green
-On_IYellow='\033[0;103m' # Yellow
-On_IBlue='\033[0;104m'   # Blue
-On_IPurple='\033[0;105m' # Purple
-On_ICyan='\033[0;106m'   # Cyan
-On_IWhite='\033[0;107m'  # White
-
 # Change Directory to DBMS Directory or Create it if it does not exist
 cd ~ || exit
 if [ -d "DBMS" ]; then
