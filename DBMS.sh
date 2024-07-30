@@ -87,7 +87,7 @@ function create_table {
 function define_table_schema {
   while true; do
     echo -e "${BBlue}Define Table Schema:${Color_Off}"
-    echo -e "${BYellow}Column Types: int, strings${Color_Off}"
+    echo -e "${BYellow}Column Types: int, string${Color_Off}"
     echo -e "${BYellow}Enter Primary Key Column as 'column_name:column_type, or enter q to exit'${Color_Off}"
     read primary_key
     if [ "$primary_key" == "q" ]; then
@@ -95,7 +95,7 @@ function define_table_schema {
       break
     fi
     if [[ ! $primary_key =~ $schema_format ]]; then
-      echo -e "${BRed}Invalid Primary key format!!1${Color_Off}"
+      echo -e "${BRed}Invalid Primary key format!!${Color_Off}"
       try_again
       continue
     fi
@@ -152,11 +152,19 @@ function insert_into_table {
       read -ra columns_array <<<"$table_schema"
       IFS=','
       read -ra values_array <<<"$values"
+
+      # Check number of values match with colums or not
+      if [ "${#columns_array[@]}" -ne "${#values_array[@]}" ]; then
+        echo -e "${BRed}Invalid number of values!${Color_Off}"
+        try_again
+        continue
+      fi
+
       index=0
       for val in "${columns_array[@]}"; do
         column=$(echo "${val}" | cut -d ":" -f 1)
         column_type=$(echo "${val}" | cut -d ":" -f 2)
-        value=$(echo "${values_array[$i]}")
+        value=$(echo "${values_array[$index]}")
 
         # check column data type
         if [ "$column_type" == "int" ]; then
@@ -167,7 +175,7 @@ function insert_into_table {
             break
           fi
         elif [ "$column_type" == "string" ]; then
-          if [[ ! "$value" =~ ^[a-zA-Z0-9_]+$ ]]; then
+          if [[ ! "$value" =~ ^[a-zA-Z0-9_/s]+$ ]]; then
             echo -e "${BRed}Invalid value for column $column, expected string!${Color_Off}"
             try_again
             valid_data=0
@@ -317,11 +325,14 @@ function update_table {
       read -ra columns_array <<<"$table_schema"
       IFS=','
       read -ra values_array <<<"$new_values"
+
+      # Check number of values match with colums or not
       if [ "${#columns_array[@]}" -ne "${#values_array[@]}" ]; then
         echo -e "${BRed}Invalid number of values!${Color_Off}"
         try_again
         continue
       fi
+
       index=0
       for val in "${columns_array[@]}"; do
         column=$(echo "${val}" | cut -d ":" -f 1)
@@ -394,7 +405,7 @@ function connect_to_database {
       esac
     done
   else
-    echo "${BRed}Database does not exist!${Color_Off}"
+    echo -e "${BRed}Database does not exist!${Color_Off}"
   fi
 }
 
